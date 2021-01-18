@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+set -e
+
+# COLOR CONSTANTS
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+NC='\033[0m'
+
+# CONFIGURATION
+project="kt-discord-channel-api"
+image_tag="latest" #default
+
+# FUNCTIONS
+function print_usage() {
+    echo "Usage: $0 -a <account> [-p <aws_credential_profile>]"
+}
+
+function notify () {
+    echo ""
+    echo -e "${PURPLE}$1${NC}"
+    echo "---------------------------------"
+}
+
+# OPTIONS
+while getopts ":a:p:h" opt; do
+      case $opt in
+          a) account=$OPTARG
+             ;;
+          p) profile=$OPTARG
+             ;;
+          h) print_usage
+             exit 0
+             ;;
+          \?)
+              print_usage
+              echo "Invalid option: -$OPTARG" >&2
+              ;;
+          :)
+              echo "Option -$OPTARG requires an argument" >&2
+              exit 1
+              ;;
+      esac
+done
+
+if test $file
+then
+    filespec="-f $file"
+fi
+
+# CONFIG REPORT
+echo -e "Project     : ${GREEN}$project${NC}"
+echo -e "Image Tag   : ${GREEN}$image_tag${NC}"
+echo -e "AWS Account : ${GREEN}$account${NC}"
+
+if test $file
+then
+    echo -e "File      : ${GREEN}$file${NC}"
+fi
+
+# MAIN
+notify "Building docker image"
+docker build --tag $project:$image_tag $filespec .
+
+notify "Logging in to ECR"
+aws ecr get-login-password --region us-west-2 --profile=$profile | docker login --username AWS --password-stdin $account.dkr.ecr.us-west-2.amazonaws.com/$project
+
+notify "Tagging image"
+docker tag $project:$image_tag $account.dkr.ecr.us-west-2.amazonaws.com/$project:$image_tag
+
+notify "Pushing image"
+docker push $account.dkr.ecr.us-west-2.amazonaws.com/$project:$image_tag

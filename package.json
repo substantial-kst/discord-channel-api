@@ -1,0 +1,42 @@
+{
+  "name": "discord-channel-api",
+  "version": "0.0.1",
+  "main": "index.js",
+  "repository": "git@github.com:substantial-kst/discord-channel-api.git",
+  "author": "Kelly Towle <kelly.towle@substantial.com>",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json --outDir ./dist",
+    "host": "node dist/server.js",
+    "watch": "tsc -p tsconfig.json --watch --outDir ./dist",
+    "lint": "tsc --noEmit && eslint './**/*.{js,ts,tsx}' --quiet --fix",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@koa/cors": "^3.1.0",
+    "@koa/router": "^10.0.0",
+    "date-fns": "^2.16.1",
+    "dotenv": "^8.2.0",
+    "koa": "^2.13.0",
+    "koa-bodyparser": "^4.3.0",
+    "koa-helmet": "^6.0.0",
+    "node-fetch": "^2.6.1",
+    "pino": "^6.8.0",
+    "pino-pretty": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/koa": "^2.11.6",
+    "@types/koa-bodyparser": "^4.3.0",
+    "@types/koa-helmet": "^6.0.1",
+    "@types/koa__cors": "^3.0.2",
+    "@types/koa__router": "^8.0.3",
+    "@types/node": "^14.14.14",
+    "@types/node-fetch": "^2.5.7",
+    "@types/pino": "^6.3.4",
+    "prettier": "^2.2.1",
+    "ts-node": "^9.1.1",
+    "tslib": "^2.0.3",
+    "typescript": "^4.1.3"
+  }
+}

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+set -e
+
+# COLOR CONSTANTS
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+NC='\033[0m'
+
+# CONFIGURATION
+cluster_name="DiscordChannel"
+service_name="DiscordChannelApi"
+
+function notify () {
+    echo ""
+    echo -e "${PURPLE}$1${NC}"
+    echo "---------------------------------"
+}
+
+# FUNCTIONS
+function print_usage() {
+    echo "Usage: $0 -p <aws_credential_profile>"
+}
+
+# OPTIONS
+while getopts ":p:h" opt; do
+      case $opt in
+          p) profile=$OPTARG
+             ;;
+          h) print_usage
+             exit 0
+             ;;
+          \?)
+              print_usage
+              echo "Invalid option: -$OPTARG" >&2
+              ;;
+          :)
+              echo "Option -$OPTARG requires an argument" >&2
+              exit 1
+              ;;
+      esac
+done
+
+# CONFIG REPORT
+echo -e "Cluster   : ${GREEN}$cluster_name${NC}"
+echo -e "Service   : ${GREEN}$service_name${NC}"
+
+# MAIN
+notify "Restarting service"
+aws ecs update-service --cluster $cluster_name --service $service_name --force-new-deployment --profile $profile > /dev/null
