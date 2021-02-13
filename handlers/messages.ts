@@ -1,9 +1,9 @@
-import Koa from "koa";
-import fetch from "node-fetch";
-import { RouterContext } from "../router";
-import { getRateLimit } from "./_rateLimit";
-import { Logger } from "../server";
-import { isBefore, isDate, addSeconds } from "date-fns";
+import Koa from 'koa';
+import fetch from 'node-fetch';
+import { RouterContext } from '../router';
+import { getRateLimit } from '../lib/_rateLimit';
+import { Logger } from '../server';
+import { isBefore, isDate, addSeconds } from 'date-fns';
 
 export interface Message {
   id: string;
@@ -49,8 +49,8 @@ let channels: Record<string, Channel> = {};
 // let rateLimit = getRateLimit();
 
 export const getQueryString = (channelId: string) => {
-  const {lastMsgId} = channels[channelId];
-  return lastMsgId ? `?after=${lastMsgId}` : "";
+  const { lastMsgId } = channels[channelId];
+  return lastMsgId ? `?after=${lastMsgId}` : '';
 };
 
 const purgeStaleMessages = (channelId: string, logger: Logger) => {
@@ -70,7 +70,7 @@ const purgeStaleMessages = (channelId: string, logger: Logger) => {
       if (isDate(new Date(messageTimestamp))) {
         const isFresh = isBefore(
           now,
-          addSeconds(new Date(messageTimestamp), 10)
+          addSeconds(new Date(messageTimestamp), 10),
         );
         // logger.debug(
         //   `Msg #${index}: timestamp is a date, is it newer than 10 seconds ago? ${isFresh}`
@@ -78,7 +78,7 @@ const purgeStaleMessages = (channelId: string, logger: Logger) => {
         return isFresh;
       }
     }
-    logger.debug("Purge fell through");
+    logger.debug('Purge fell through');
     return true;
   });
 };
@@ -86,15 +86,18 @@ const purgeStaleMessages = (channelId: string, logger: Logger) => {
 export const updateMessages = (
   channelId: string,
   newMessages: Message[],
-  logger: Logger
+  logger: Logger,
 ) => {
-  logger.debug("*** Updating messages for channel: %s", channelId);
+  logger.debug('*** Updating messages for channel: %s', channelId);
   let combinedMessages: Message[] = channels[channelId].messages;
   if (Array.isArray(newMessages) && newMessages.length > 0) {
     // logger.debug("Received messages count: %s", newMessages.length);
     channels[channelId].lastMsgId = newMessages[0].id;
     // logger.debug("Last message received: %s", channels[channelId].lastMsgId);
-    combinedMessages = [...channels[channelId].messages, ...newMessages.reverse()];
+    combinedMessages = [
+      ...channels[channelId].messages,
+      ...newMessages.reverse(),
+    ];
   }
   return combinedMessages;
 };
@@ -102,13 +105,15 @@ export const updateMessages = (
 export const fetchNewMessages = async (channelId: string) => {
   channels[channelId].pendingFetch = true;
   return fetch(
-    `https://discord.com/api/v7/channels/${channelId}/messages${getQueryString(channelId)}`,
+    `https://discord.com/api/v7/channels/${channelId}/messages${getQueryString(
+      channelId,
+    )}`,
     {
       headers: {
         authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
       },
-      method: "GET",
-    }
+      method: 'GET',
+    },
   );
 };
 
@@ -127,7 +132,7 @@ export const messagesHandler = async (ctx: RouterContext, next: Koa.Next) => {
     channels[channelId].messages = [];
   }
   if (!channels[channelId].rateLimit.canFetch(ctx.logger)) {
-    ctx.logger.warn("Rate limit exceeded");
+    ctx.logger.warn('Rate limit exceeded');
   } else {
     // ctx.logger.debug("Pending fetch? %s", channels[channelId].pendingFetch);
     if (!channels[channelId].pendingFetch) {
@@ -140,11 +145,15 @@ export const messagesHandler = async (ctx: RouterContext, next: Koa.Next) => {
       const newMessages = await result.json();
 
       // ctx.logger.debug("New messages count: %s", newMessages.length);
-      channels[channelId].messages = updateMessages(channelId, newMessages, ctx.logger);
+      channels[channelId].messages = updateMessages(
+        channelId,
+        newMessages,
+        ctx.logger,
+      );
       purgeStaleMessages(channelId, ctx.logger);
       channels[channelId].lastFetch = new Date().toISOString();
     } else {
-      ctx.logger.warn("Prior fetch request pending");
+      ctx.logger.warn('Prior fetch request pending');
     }
   }
   ctx.response.body = channels[channelId].messages;

@@ -1,7 +1,7 @@
 {
   "name": "discord-channel-api",
   "version": "0.0.1",
-  "main": "index.js",
+  "main": "dist/server.js",
   "repository": "git@github.com:substantial-kst/discord-channel-api.git",
   "author": "Kelly Towle <kelly.towle@substantial.com>",
   "license": "MIT",
