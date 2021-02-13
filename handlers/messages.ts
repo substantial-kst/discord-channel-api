@@ -35,28 +35,36 @@ export interface Message {
   referenced_message?: Message;
 }
 
-let pendingFetch: boolean = false;
-let lastReceivedMessageId: string;
-let messages: Record<string, Message[]> = {};
+interface Channel {
+  messages: Message[];
+  lastMsgId: string;
+  pendingFetch: boolean;
+  rateLimit: ReturnType<typeof getRateLimit>;
+  lastFetch?: string;
+}
+
+let channels: Record<string, Channel> = {};
 
 // Initialize rate-limit state values
-let rateLimit = getRateLimit();
+// let rateLimit = getRateLimit();
 
-export const getQueryString = () =>
-  lastReceivedMessageId ? `?after=${lastReceivedMessageId}` : "";
+export const getQueryString = (channelId: string) => {
+  const {lastMsgId} = channels[channelId];
+  return lastMsgId ? `?after=${lastMsgId}` : "";
+};
 
-const purgeStaleMessages = (channel: string, logger: Logger) => {
+const purgeStaleMessages = (channelId: string, logger: Logger) => {
   const now = new Date();
-  const allMessages = [...messages[channel]];
-  messages[channel] = allMessages.filter((msg, index, arr) => {
+  const allMessages = [...channels[channelId].messages];
+  channels[channelId].messages = allMessages.filter((msg, index, arr) => {
     const messageTimestamp = msg.timestamp;
     const limit = 5;
     const isOldMessageIndex = index < arr.length - limit;
     if (isOldMessageIndex) {
-      logger.debug(
-        `Is #${index} NOT one of the last ${limit} messages of ${arr.length}? %s`,
-        isOldMessageIndex
-      );
+      // logger.debug(
+      //   `Is #${index} NOT one of the last ${limit} messages of ${arr.length}? %s`,
+      //   isOldMessageIndex
+      // );
       return false;
     } else {
       if (isDate(new Date(messageTimestamp))) {
@@ -64,9 +72,9 @@ const purgeStaleMessages = (channel: string, logger: Logger) => {
           now,
           addSeconds(new Date(messageTimestamp), 10)
         );
-        logger.debug(
-          `Msg #${index}: timestamp is a date, is it newer than 10 seconds ago? ${isFresh}`
-        );
+        // logger.debug(
+        //   `Msg #${index}: timestamp is a date, is it newer than 10 seconds ago? ${isFresh}`
+        // );
         return isFresh;
       }
     }
@@ -76,25 +84,25 @@ const purgeStaleMessages = (channel: string, logger: Logger) => {
 };
 
 export const updateMessages = (
-  channel: string,
+  channelId: string,
   newMessages: Message[],
   logger: Logger
 ) => {
-  logger.debug("Updating messages for channel: %s", channel);
-  let combinedMessages: Message[] = messages[channel];
+  logger.debug("*** Updating messages for channel: %s", channelId);
+  let combinedMessages: Message[] = channels[channelId].messages;
   if (Array.isArray(newMessages) && newMessages.length > 0) {
-    logger.debug("Received messages count: %s", newMessages.length);
-    lastReceivedMessageId = newMessages[0].id;
-    logger.debug("Last message received: %s", lastReceivedMessageId);
-    combinedMessages = [...messages[channel], ...newMessages.reverse()];
+    // logger.debug("Received messages count: %s", newMessages.length);
+    channels[channelId].lastMsgId = newMessages[0].id;
+    // logger.debug("Last message received: %s", channels[channelId].lastMsgId);
+    combinedMessages = [...channels[channelId].messages, ...newMessages.reverse()];
   }
   return combinedMessages;
 };
 
-export const fetchNewMessages = async (channel: string) => {
-  pendingFetch = true;
+export const fetchNewMessages = async (channelId: string) => {
+  channels[channelId].pendingFetch = true;
   return fetch(
-    `https://discord.com/api/v7/channels/${channel}/messages${getQueryString()}`,
+    `https://discord.com/api/v7/channels/${channelId}/messages${getQueryString(channelId)}`,
     {
       headers: {
         authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
@@ -105,31 +113,43 @@ export const fetchNewMessages = async (channel: string) => {
 };
 
 export const messagesHandler = async (ctx: RouterContext, next: Koa.Next) => {
-  const { channel } = ctx.request.query;
-  if (!Array.isArray(messages[channel])) {
-    messages[channel] = [];
+  const { channel: channelId } = ctx.request.query;
+  if (!channels[channelId]) {
+    channels[channelId] = {
+      messages: [],
+      lastMsgId: '',
+      rateLimit: getRateLimit(),
+      pendingFetch: false,
+      lastFetch: undefined,
+    };
   }
-  if (!rateLimit.canFetch(ctx.logger)) {
+  if (!Array.isArray(channels[channelId].messages)) {
+    channels[channelId].messages = [];
+  }
+  if (!channels[channelId].rateLimit.canFetch(ctx.logger)) {
     ctx.logger.warn("Rate limit exceeded");
   } else {
-    ctx.logger.debug("Pending fetch? %s", pendingFetch);
-    if (!pendingFetch) {
-      ctx.logger.debug("Fetching messages");
-      const result = await fetchNewMessages(channel);
-      rateLimit.update(result, ctx.logger);
+    // ctx.logger.debug("Pending fetch? %s", channels[channelId].pendingFetch);
+    if (!channels[channelId].pendingFetch) {
+      // ctx.logger.debug("Fetching messages");
+      const result = await fetchNewMessages(channelId);
+      channels[channelId].rateLimit.update(result, ctx.logger);
       setTimeout(() => {
-        pendingFetch = false;
+        channels[channelId].pendingFetch = false;
       }, 1000);
       const newMessages = await result.json();
 
-      ctx.logger.debug("New messages count: %s", newMessages.length);
-      messages[channel] = updateMessages(channel, newMessages, ctx.logger);
-      purgeStaleMessages(channel, ctx.logger);
+      // ctx.logger.debug("New messages count: %s", newMessages.length);
+      channels[channelId].messages = updateMessages(channelId, newMessages, ctx.logger);
+      purgeStaleMessages(channelId, ctx.logger);
+      channels[channelId].lastFetch = new Date().toISOString();
     } else {
       ctx.logger.warn("Prior fetch request pending");
     }
   }
-  ctx.response.body = messages[channel];
+  ctx.response.body = channels[channelId].messages;
   ctx.response.status = 200;
+
+  ctx.logger.debug(`**** Channels: %o`, channels);
   return next();
 };
