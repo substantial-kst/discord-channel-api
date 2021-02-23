@@ -10,7 +10,7 @@ PURPLE='\033[0;35m'
 NC='\033[0m'
 
 # CONFIGURATION
-project="kt-discord-channel-api"
+project="discord-overlay-api"
 image_tag="latest" #default
 
 # FUNCTIONS
@@ -65,10 +65,10 @@ notify "Building docker image"
 docker build --tag $project:$image_tag $filespec .
 
 notify "Logging in to ECR"
-aws ecr get-login-password --region us-west-2 --profile=$profile | docker login --username AWS --password-stdin $account.dkr.ecr.us-west-2.amazonaws.com/$project
+aws ecr get-login-password --region us-east-1 --profile=$profile | docker login --username AWS --password-stdin $account.dkr.ecr.us-east-1.amazonaws.com/$project
 
 notify "Tagging image"
-docker tag $project:$image_tag $account.dkr.ecr.us-west-2.amazonaws.com/$project:$image_tag
+docker tag $project:$image_tag $account.dkr.ecr.us-east-1.amazonaws.com/$project:$image_tag
 
 notify "Pushing image"
-docker push $account.dkr.ecr.us-west-2.amazonaws.com/$project:$image_tag
+docker push $account.dkr.ecr.us-east-1.amazonaws.com/$project:$image_tag

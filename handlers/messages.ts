@@ -1,8 +1,7 @@
 import Koa from 'koa';
 import fetch from 'node-fetch';
 import { RouterContext } from '../router';
-import { getRateLimit } from '../lib/_rateLimit';
-import { Logger } from '../server';
+import { Logger, channels, createChannel, Channel } from '../server';
 import { isBefore, isDate, addSeconds } from 'date-fns';
 
 export interface Message {
@@ -34,16 +33,6 @@ export interface Message {
   };
   referenced_message?: Message;
 }
-
-interface Channel {
-  messages: Message[];
-  lastMsgId: string;
-  pendingFetch: boolean;
-  rateLimit: ReturnType<typeof getRateLimit>;
-  lastFetch?: string;
-}
-
-let channels: Record<string, Channel> = {};
 
 // Initialize rate-limit state values
 // let rateLimit = getRateLimit();
@@ -117,16 +106,17 @@ export const fetchNewMessages = async (channelId: string) => {
   );
 };
 
+export const attributeToNickname = (msg: Message, channel: Channel) => {
+  const nickname = channel.users[msg.author.id];
+  if (nickname) {
+    msg.author.username = nickname;
+  }
+};
+
 export const messagesHandler = async (ctx: RouterContext, next: Koa.Next) => {
   const { channel: channelId } = ctx.request.query;
   if (!channels[channelId]) {
-    channels[channelId] = {
-      messages: [],
-      lastMsgId: '',
-      rateLimit: getRateLimit(),
-      pendingFetch: false,
-      lastFetch: undefined,
-    };
+    createChannel(channelId);
   }
   if (!Array.isArray(channels[channelId].messages)) {
     channels[channelId].messages = [];
@@ -142,7 +132,11 @@ export const messagesHandler = async (ctx: RouterContext, next: Koa.Next) => {
       setTimeout(() => {
         channels[channelId].pendingFetch = false;
       }, 1000);
+
       const newMessages = await result.json();
+      newMessages.forEach((msg: Message) =>
+        attributeToNickname(msg, channels[channelId]),
+      );
 
       // ctx.logger.debug("New messages count: %s", newMessages.length);
       channels[channelId].messages = updateMessages(
